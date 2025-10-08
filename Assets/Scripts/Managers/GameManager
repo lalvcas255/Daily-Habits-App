@@ -1,0 +1,260 @@
+using System.Collections.Generic;
+using System.Linq;
+using UnityEngine;
+using UnityEngine.Events;
+
+public class GameManager : MonoBehaviour
+{
+    public static GameManager Instance { get; private set; }
+
+    [Header("Game Data")]
+    public GameData gameData;
+
+    [Header("Events")]
+    public UnityEvent<int> OnXPGained;
+    public UnityEvent OnLevelUp;
+    public UnityEvent<Achievement> OnAchievementUnlocked;
+    public UnityEvent OnHabitCompleted;
+    public UnityEvent OnDataLoaded;
+
+    private List<Achievement> allAchievements;
+
+    private void Awake()
+    {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+        Instance = this;
+        DontDestroyOnLoad(gameObject);
+
+        InitializeEvents();
+        InitializeAchievements();
+        LoadGame();
+    }
+
+    private void InitializeEvents()
+    {
+        if (OnXPGained == null) OnXPGained = new UnityEvent<int>();
+        if (OnLevelUp == null) OnLevelUp = new UnityEvent();
+        if (OnAchievementUnlocked == null) OnAchievementUnlocked = new UnityEvent<Achievement>();
+        if (OnHabitCompleted == null) OnHabitCompleted = new UnityEvent();
+        if (OnDataLoaded == null) OnDataLoaded = new UnityEvent();
+    }
+
+    private void InitializeAchievements()
+    {
+        allAchievements = new List<Achievement>
+        {
+            new Achievement("first_habit", "Primer Paso", "Completa tu primer hábito", "🎯", 25),
+            new Achievement("streak_7", "Una Semana", "Mantén una racha de 7 días", "🔥", 50),
+            new Achievement("streak_30", "Un Mes Completo", "Mantén una racha de 30 días", "💪", 150),
+            new Achievement("level_5", "Aprendiz", "Alcanza el nivel 5", "⭐", 50),
+            new Achievement("level_10", "Guerrero", "Alcanza el nivel 10", "⚔️", 100),
+            new Achievement("level_20", "Maestro", "Alcanza el nivel 20", "👑", 200),
+            new Achievement("habits_5", "Coleccionista", "Crea 5 hábitos diferentes", "📚", 75),
+            new Achievement("habits_10", "Dedicado", "Crea 10 hábitos diferentes", "🏆", 150),
+            new Achievement("perfect_day", "Día Perfecto", "Completa todos tus hábitos en un día", "✨", 100),
+            new Achievement("total_100", "Centenario", "Completa 100 hábitos en total", "💯", 200)
+        };
+    }
+
+    // GESTIÓN DE HÁBITOS
+    public void CreateHabit(string name, string description, HabitCategory category, string icon = "⭐")
+    {
+        Habit newHabit = new Habit(name, description, category, icon);
+        gameData.habits.Add(newHabit);
+        SaveGame();
+        CheckAchievements();
+    }
+
+    public void EditHabit(string habitId, string name, string description, HabitCategory category, string icon)
+    {
+        Habit habit = GetHabitById(habitId);
+        if (habit != null)
+        {
+            habit.name = name;
+            habit.description = description;
+            habit.category = category;
+            habit.iconName = icon;
+            SaveGame();
+        }
+    }
+
+    public void DeleteHabit(string habitId)
+    {
+        Habit habit = GetHabitById(habitId);
+        if (habit != null)
+        {
+            gameData.habits.Remove(habit);
+            SaveGame();
+        }
+    }
+
+    public void ToggleHabitCompletion(string habitId)
+    {
+        Habit habit = GetHabitById(habitId);
+        if (habit != null)
+        {
+            if (habit.IsCompletedToday())
+            {
+                habit.UnmarkToday();
+                // Restar XP si se desmarca
+                gameData.userProfile.AddXP(-habit.xpReward);
+            }
+            else
+            {
+                habit.MarkAsCompleted();
+                // Añadir XP
+                bool leveledUp = gameData.userProfile.AddXP(habit.xpReward);
+                
+                OnXPGained?.Invoke(habit.xpReward);
+                OnHabitCompleted?.Invoke();
+                
+                if (leveledUp)
+                {
+                    OnLevelUp?.Invoke();
+                }
+                
+                CheckAchievements();
+            }
+            SaveGame();
+        }
+    }
+
+    public Habit GetHabitById(string habitId)
+    {
+        return gameData.habits.FirstOrDefault(h => h.id == habitId);
+    }
+
+    public List<Habit> GetActiveHabits()
+    {
+        return gameData.habits.Where(h => h.isActive).ToList();
+    }
+
+    public int GetCompletedHabitsToday()
+    {
+        return gameData.habits.Count(h => h.IsCompletedToday());
+    }
+
+    public int GetTotalHabitsCompletions()
+    {
+        return gameData.habits.Sum(h => h.GetTotalCompletions());
+    }
+
+    // GESTIÓN DE LOGROS
+    private void CheckAchievements()
+    {
+        // Primer hábito
+        if (!gameData.userProfile.HasAchievement("first_habit"))
+        {
+            if (GetTotalHabitsCompletions() >= 1)
+            {
+                UnlockAchievement("first_habit");
+            }
+        }
+
+        // Rachas
+        int maxStreak = gameData.habits.Max(h => h.GetCurrentStreak());
+        if (maxStreak >= 7 && !gameData.userProfile.HasAchievement("streak_7"))
+        {
+            UnlockAchievement("streak_7");
+        }
+        if (maxStreak >= 30 && !gameData.userProfile.HasAchievement("streak_30"))
+        {
+            UnlockAchievement("streak_30");
+        }
+
+        // Niveles
+        if (gameData.userProfile.level >= 5 && !gameData.userProfile.HasAchievement("level_5"))
+        {
+            UnlockAchievement("level_5");
+        }
+        if (gameData.userProfile.level >= 10 && !gameData.userProfile.HasAchievement("level_10"))
+        {
+            UnlockAchievement("level_10");
+        }
+        if (gameData.userProfile.level >= 20 && !gameData.userProfile.HasAchievement("level_20"))
+        {
+            UnlockAchievement("level_20");
+        }
+
+        // Cantidad de hábitos
+        int totalHabits = gameData.habits.Count;
+        if (totalHabits >= 5 && !gameData.userProfile.HasAchievement("habits_5"))
+        {
+            UnlockAchievement("habits_5");
+        }
+        if (totalHabits >= 10 && !gameData.userProfile.HasAchievement("habits_10"))
+        {
+            UnlockAchievement("habits_10");
+        }
+
+        // Día perfecto
+        if (GetActiveHabits().Count > 0 && GetCompletedHabitsToday() == GetActiveHabits().Count)
+        {
+            if (!gameData.userProfile.HasAchievement("perfect_day"))
+            {
+                UnlockAchievement("perfect_day");
+            }
+        }
+
+        // Total de completaciones
+        if (GetTotalHabitsCompletions() >= 100 && !gameData.userProfile.HasAchievement("total_100"))
+        {
+            UnlockAchievement("total_100");
+        }
+    }
+
+    private void UnlockAchievement(string achievementId)
+    {
+        Achievement achievement = allAchievements.FirstOrDefault(a => a.id == achievementId);
+        if (achievement != null && !achievement.isUnlocked)
+        {
+            achievement.isUnlocked = true;
+            gameData.userProfile.UnlockAchievement(achievementId);
+            gameData.userProfile.AddXP(achievement.xpReward);
+            
+            OnAchievementUnlocked?.Invoke(achievement);
+            SaveGame();
+        }
+    }
+
+    public List<Achievement> GetAllAchievements()
+    {
+        foreach (Achievement achievement in allAchievements)
+        {
+            achievement.isUnlocked = gameData.userProfile.HasAchievement(achievement.id);
+        }
+        return allAchievements;
+    }
+
+    // GUARDADO/CARGA
+    public void SaveGame()
+    {
+        if (SaveSystem.Instance != null)
+        {
+            SaveSystem.Instance.SaveData(gameData);
+        }
+    }
+
+    public void LoadGame()
+    {
+        if (SaveSystem.Instance != null)
+        {
+            gameData = SaveSystem.Instance.LoadData();
+            OnDataLoaded?.Invoke();
+        }
+    }
+
+    public void ResetAllData()
+    {
+        if (SaveSystem.Instance != null)
+        {
+            SaveSystem.Instance.DeleteAllData();
+            gameData = new GameData();
+            OnDataLoaded?.Invoke();
+        }
+    }
+}

@@ -1,0 +1,132 @@
+using UnityEngine;
+using UnityEngine.UI;
+using System.Collections;
+
+public class UIManager : MonoBehaviour
+{
+    public static UIManager Instance { get; private set; }
+
+    [Header("Screens")]
+    public GameObject homeScreen;
+    public GameObject habitsScreen;
+    public GameObject profileScreen;
+    public GameObject achievementsScreen;
+    public GameObject createHabitScreen;
+
+    [Header("Panels")]
+    public GameObject achievementPopup;
+    public GameObject levelUpPopup;
+
+    private GameObject currentScreen;
+
+    private void Awake()
+    {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+        Instance = this;
+    }
+
+    private void Start()
+    {
+        // Suscribirse a eventos
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.OnAchievementUnlocked.AddListener(ShowAchievementPopup);
+            GameManager.Instance.OnLevelUp.AddListener(ShowLevelUpPopup);
+        }
+
+        ShowHomeScreen();
+    }
+
+    // NAVEGACIÓN ENTRE PANTALLAS
+    public void ShowHomeScreen()
+    {
+        SwitchScreen(homeScreen);
+    }
+
+    public void ShowHabitsScreen()
+    {
+        SwitchScreen(habitsScreen);
+    }
+
+    public void ShowProfileScreen()
+    {
+        SwitchScreen(profileScreen);
+    }
+
+    public void ShowAchievementsScreen()
+    {
+        SwitchScreen(achievementsScreen);
+    }
+
+    public void ShowCreateHabitScreen()
+    {
+        createHabitScreen.SetActive(true);
+    }
+
+    public void HideCreateHabitScreen()
+    {
+        createHabitScreen.SetActive(false);
+    }
+
+    private void SwitchScreen(GameObject newScreen)
+    {
+        if (currentScreen != null)
+        {
+            currentScreen.SetActive(false);
+        }
+
+        currentScreen = newScreen;
+        currentScreen.SetActive(true);
+    }
+
+    // POPUPS
+    public void ShowAchievementPopup(Achievement achievement)
+    {
+        if (achievementPopup != null)
+        {
+            achievementPopup.SetActive(true);
+            
+            // Actualizar UI del popup
+            var popup = achievementPopup.GetComponent<AchievementPopup>();
+            if (popup != null)
+            {
+                popup.ShowAchievement(achievement);
+            }
+            
+            StartCoroutine(HidePopupAfterDelay(achievementPopup, 3f));
+        }
+    }
+
+    public void ShowLevelUpPopup()
+    {
+        if (levelUpPopup != null)
+        {
+            levelUpPopup.SetActive(true);
+            
+            var popup = levelUpPopup.GetComponent<LevelUpPopup>();
+            if (popup != null)
+            {
+                popup.ShowLevelUp(GameManager.Instance.gameData.userProfile.level);
+            }
+            
+            StartCoroutine(HidePopupAfterDelay(levelUpPopup, 2.5f));
+        }
+    }
+
+    private IEnumerator HidePopupAfterDelay(GameObject popup, float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        popup.SetActive(false);
+    }
+
+    // UTILIDADES
+    public void ShowNotification(string message)
+    {
+        Debug.Log($"Notification: {message}");
+        // Aquí puedes implementar un sistema de notificaciones toast
+    }
+}

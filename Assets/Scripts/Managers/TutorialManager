@@ -1,0 +1,252 @@
+using UnityEngine;
+using UnityEngine.UI;
+using TMPro;
+using System.Collections;
+using System.Collections.Generic;
+
+[System.Serializable]
+public class TutorialStep
+{
+    public string title;
+    [TextArea(3, 6)]
+    public string description;
+    public Sprite illustrationImage;
+    public GameObject highlightTarget; // Objeto a resaltar en la UI
+}
+
+public class TutorialManager : MonoBehaviour
+{
+    public static TutorialManager Instance { get; private set; }
+
+    [Header("Tutorial Steps")]
+    public List<TutorialStep> tutorialSteps;
+
+    [Header("UI Elements")]
+    public GameObject tutorialPanel;
+    public TextMeshProUGUI titleText;
+    public TextMeshProUGUI descriptionText;
+    public Image illustrationImage;
+    public Button nextButton;
+    public Button skipButton;
+    public TextMeshProUGUI stepCounterText;
+
+    [Header("Highlight")]
+    public GameObject highlightOverlay;
+    public Image highlightMask;
+
+    private int currentStepIndex = 0;
+    private bool tutorialCompleted = false;
+
+    private void Awake()
+    {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+        Instance = this;
+    }
+
+    private void Start()
+    {
+        nextButton.onClick.AddListener(NextStep);
+        skipButton.onClick.AddListener(SkipTutorial);
+
+        tutorialCompleted = PlayerPrefs.GetInt("TutorialCompleted", 0) == 1;
+
+        if (!tutorialCompleted && !SaveSystem.Instance.HasSavedData())
+        {
+            StartTutorial();
+        }
+        else
+        {
+            tutorialPanel.SetActive(false);
+        }
+    }
+
+    public void StartTutorial()
+    {
+        currentStepIndex = 0;
+        tutorialPanel.SetActive(true);
+        ShowStep(currentStepIndex);
+    }
+
+    private void ShowStep(int index)
+    {
+        if (index < 0 || index >= tutorialSteps.Count) return;
+
+        TutorialStep step = tutorialSteps[index];
+
+        titleText.text = step.title;
+        descriptionText.text = step.description;
+        
+        if (illustrationImage != null && step.illustrationImage != null)
+        {
+            illustrationImage.sprite = step.illustrationImage;
+            illustrationImage.gameObject.SetActive(true);
+        }
+        else
+        {
+            illustrationImage.gameObject.SetActive(false);
+        }
+
+        stepCounterText.text = $"{index + 1}/{tutorialSteps.Count}";
+
+        // Resaltar elemento si existe
+        if (step.highlightTarget != null)
+        {
+            HighlightElement(step.highlightTarget);
+        }
+        else
+        {
+            HideHighlight();
+        }
+
+        // Cambiar texto del botón en último paso
+        if (index == tutorialSteps.Count - 1)
+        {
+            nextButton.GetComponentInChildren<TextMeshProUGUI>().text = "¡Empezar!";
+        }
+        else
+        {
+            nextButton.GetComponentInChildren<TextMeshProUGUI>().text = "Siguiente";
+        }
+    }
+
+    private void NextStep()
+    {
+        currentStepIndex++;
+
+        if (currentStepIndex >= tutorialSteps.Count)
+        {
+            CompleteTutorial();
+        }
+        else
+        {
+            ShowStep(currentStepIndex);
+        }
+    }
+
+    private void SkipTutorial()
+    {
+        CompleteTutorial();
+    }
+
+    private void CompleteTutorial()
+    {
+        tutorialCompleted = true;
+        PlayerPrefs.SetInt("TutorialCompleted", 1);
+        PlayerPrefs.Save();
+
+        tutorialPanel.SetActive(false);
+        HideHighlight();
+
+        // Crear hábito de ejemplo
+        CreateExampleHabit();
+    }
+
+    private void CreateExampleHabit()
+    {
+        if (GameManager.Instance != null && GameManager.Instance.gameData.habits.Count == 0)
+        {
+            GameManager.Instance.CreateHabit(
+                "Beber 8 vasos de agua",
+                "Mantener una buena hidratación durante el día",
+                HabitCategory.Health,
+                "💧"
+            );
+        }
+    }
+
+    private void HighlightElement(GameObject target)
+    {
+        if (highlightOverlay == null || highlightMask == null) return;
+
+        highlightOverlay.SetActive(true);
+
+        RectTransform targetRect = target.GetComponent<RectTransform>();
+        if (targetRect != null)
+        {
+            // Posicionar máscara sobre el elemento
+            highlightMask.rectTransform.position = targetRect.position;
+            highlightMask.rectTransform.sizeDelta = targetRect.sizeDelta * 1.2f;
+        }
+    }
+
+    private void HideHighlight()
+    {
+        if (highlightOverlay != null)
+        {
+            highlightOverlay.SetActive(false);
+        }
+    }
+
+    public void ResetTutorial()
+    {
+        PlayerPrefs.SetInt("TutorialCompleted", 0);
+        PlayerPrefs.Save();
+        tutorialCompleted = false;
+    }
+
+    private void OnDestroy()
+    {
+        nextButton.onClick.RemoveListener(NextStep);
+        skipButton.onClick.RemoveListener(SkipTutorial);
+    }
+}
+
+// ========== WELCOME SCREEN ==========
+public class WelcomeScreen : MonoBehaviour
+{
+    [Header("UI Elements")]
+    public TMP_InputField nameInputField;
+    public Button startButton;
+    public GameObject welcomePanel;
+
+    private void Start()
+    {
+        bool hasSeenWelcome = PlayerPrefs.GetInt("HasSeenWelcome", 0) == 1;
+
+        if (!hasSeenWelcome)
+        {
+            welcomePanel.SetActive(true);
+            startButton.onClick.AddListener(OnStartClicked);
+        }
+        else
+        {
+            welcomePanel.SetActive(false);
+        }
+    }
+
+    private void OnStartClicked()
+    {
+        string userName = nameInputField.text;
+
+        if (string.IsNullOrEmpty(userName))
+        {
+            userName = "Héroe";
+        }
+
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.gameData.userProfile.userName = userName;
+            GameManager.Instance.SaveGame();
+        }
+
+        PlayerPrefs.SetInt("HasSeenWelcome", 1);
+        PlayerPrefs.Save();
+
+        welcomePanel.SetActive(false);
+
+        // Iniciar tutorial
+        if (TutorialManager.Instance != null)
+        {
+            TutorialManager.Instance.StartTutorial();
+        }
+    }
+
+    private void OnDestroy()
+    {
+        startButton.onClick.RemoveListener(OnStartClicked);
+    }
+}

@@ -1,0 +1,212 @@
+using UnityEngine;
+using UnityEngine.UI;
+using TMPro;
+
+public class SettingsManager : MonoBehaviour
+{
+    public static SettingsManager Instance { get; private set; }
+
+    [Header("Settings Data")]
+    public bool vibrationEnabled = true;
+    public bool darkModeEnabled = false;
+    public string language = "es";
+
+    private void Awake()
+    {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+        Instance = this;
+        DontDestroyOnLoad(gameObject);
+
+        LoadSettings();
+    }
+
+    public void SetVibration(bool enabled)
+    {
+        vibrationEnabled = enabled;
+        PlayerPrefs.SetInt("VibrationEnabled", enabled ? 1 : 0);
+        PlayerPrefs.Save();
+    }
+
+    public void SetDarkMode(bool enabled)
+    {
+        darkModeEnabled = enabled;
+        PlayerPrefs.SetInt("DarkMode", enabled ? 1 : 0);
+        PlayerPrefs.Save();
+        
+        // Aplicar tema
+        ApplyTheme();
+    }
+
+    public void SetLanguage(string lang)
+    {
+        language = lang;
+        PlayerPrefs.SetString("Language", lang);
+        PlayerPrefs.Save();
+    }
+
+    private void LoadSettings()
+    {
+        vibrationEnabled = PlayerPrefs.GetInt("VibrationEnabled", 1) == 1;
+        darkModeEnabled = PlayerPrefs.GetInt("DarkMode", 0) == 1;
+        language = PlayerPrefs.GetString("Language", "es");
+        
+        ApplyTheme();
+    }
+
+    private void ApplyTheme()
+    {
+        // Aquí puedes cambiar colores de UI según el tema
+        Color backgroundColor = darkModeEnabled ? new Color(0.1f, 0.1f, 0.1f) : Color.white;
+        Color textColor = darkModeEnabled ? Color.white : Color.black;
+        
+        // Aplicar a todos los paneles y textos (simplificado)
+        Camera.main.backgroundColor = backgroundColor;
+    }
+
+    public void Vibrate()
+    {
+        if (vibrationEnabled)
+        {
+#if UNITY_ANDROID || UNITY_IOS
+            Handheld.Vibrate();
+#endif
+        }
+    }
+}
+
+// ========== UI DE CONFIGURACIONES ==========
+public class SettingsScreenUI : MonoBehaviour
+{
+    [Header("General Settings")]
+    public Toggle vibrationToggle;
+    public Toggle darkModeToggle;
+    public TMP_Dropdown languageDropdown;
+
+    [Header("Data Management")]
+    public Button exportDataButton;
+    public Button resetDataButton;
+
+    [Header("About")]
+    public TextMeshProUGUI versionText;
+    public Button creditsButton;
+
+    [Header("Panels")]
+    public GameObject confirmResetPanel;
+
+    private void Start()
+    {
+        LoadUISettings();
+        
+        // Listeners
+        vibrationToggle.onValueChanged.AddListener(OnVibrationToggled);
+        darkModeToggle.onValueChanged.AddListener(OnDarkModeToggled);
+        languageDropdown.onValueChanged.AddListener(OnLanguageChanged);
+        
+        exportDataButton.onClick.AddListener(OnExportDataClicked);
+        resetDataButton.onClick.AddListener(OnResetDataClicked);
+        
+        // Versión
+        versionText.text = $"Versión {Application.version}";
+    }
+
+    private void LoadUISettings()
+    {
+        if (SettingsManager.Instance != null)
+        {
+            vibrationToggle.isOn = SettingsManager.Instance.vibrationEnabled;
+            darkModeToggle.isOn = SettingsManager.Instance.darkModeEnabled;
+            
+            // Idioma
+            string lang = SettingsManager.Instance.language;
+            languageDropdown.value = lang == "es" ? 0 : 1;
+        }
+    }
+
+    private void OnVibrationToggled(bool enabled)
+    {
+        SettingsManager.Instance?.SetVibration(enabled);
+    }
+
+    private void OnDarkModeToggled(bool enabled)
+    {
+        SettingsManager.Instance?.SetDarkMode(enabled);
+    }
+
+    private void OnLanguageChanged(int index)
+    {
+        string lang = index == 0 ? "es" : "en";
+        SettingsManager.Instance?.SetLanguage(lang);
+    }
+
+    private void OnExportDataClicked()
+    {
+        // Exportar datos a JSON
+        ExportData();
+    }
+
+    private void OnResetDataClicked()
+    {
+        // Mostrar confirmación
+        if (confirmResetPanel != null)
+        {
+            confirmResetPanel.SetActive(true);
+        }
+    }
+
+    public void ConfirmResetData()
+    {
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.ResetAllData();
+            UIManager.Instance?.ShowNotification("Datos reiniciados correctamente");
+        }
+        
+        if (confirmResetPanel != null)
+        {
+            confirmResetPanel.SetActive(false);
+        }
+    }
+
+    public void CancelResetData()
+    {
+        if (confirmResetPanel != null)
+        {
+            confirmResetPanel.SetActive(false);
+        }
+    }
+
+    private void ExportData()
+    {
+        if (GameManager.Instance == null) return;
+
+        string json = JsonUtility.ToJson(GameManager.Instance.gameData, true);
+        string fileName = $"HabitTracker_Export_{System.DateTime.Now:yyyy-MM-dd_HH-mm-ss}.json";
+        
+#if UNITY_ANDROID || UNITY_IOS
+        // Para móvil, guardar en carpeta persistente
+        string filePath = System.IO.Path.Combine(Application.persistentDataPath, fileName);
+        System.IO.File.WriteAllText(filePath, json);
+        UIManager.Instance?.ShowNotification($"Datos exportados a: {filePath}");
+#else
+        // Para editor/PC, guardar en carpeta del proyecto
+        string filePath = System.IO.Path.Combine(Application.dataPath, fileName);
+        System.IO.File.WriteAllText(filePath, json);
+        UIManager.Instance?.ShowNotification($"Datos exportados a: {filePath}");
+#endif
+        
+        Debug.Log($"Datos exportados: {filePath}");
+    }
+
+    private void OnDestroy()
+    {
+        vibrationToggle.onValueChanged.RemoveListener(OnVibrationToggled);
+        darkModeToggle.onValueChanged.RemoveListener(OnDarkModeToggled);
+        languageDropdown.onValueChanged.RemoveListener(OnLanguageChanged);
+        exportDataButton.onClick.RemoveListener(OnExportDataClicked);
+        resetDataButton.onClick.RemoveListener(OnResetDataClicked);
+    }
+}

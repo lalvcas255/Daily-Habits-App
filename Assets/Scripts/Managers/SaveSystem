@@ -1,0 +1,92 @@
+using System.Collections.Generic;
+using UnityEngine;
+
+[System.Serializable]
+public class GameData
+{
+    public UserProfile userProfile;
+    public List<Habit> habits;
+    public List<Achievement> achievements;
+
+    public GameData()
+    {
+        userProfile = new UserProfile();
+        habits = new List<Habit>();
+        achievements = new List<Achievement>();
+    }
+}
+
+public class SaveSystem : MonoBehaviour
+{
+    private const string SAVE_KEY = "HabitTrackerSaveData";
+
+    public static SaveSystem Instance { get; private set; }
+
+    private void Awake()
+    {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+        Instance = this;
+        DontDestroyOnLoad(gameObject);
+    }
+
+    // Guardar datos
+    public void SaveData(GameData data)
+    {
+        string json = JsonUtility.ToJson(data, true);
+        PlayerPrefs.SetString(SAVE_KEY, json);
+        PlayerPrefs.Save();
+        Debug.Log("Datos guardados exitosamente");
+    }
+
+    // Cargar datos
+    public GameData LoadData()
+    {
+        if (PlayerPrefs.HasKey(SAVE_KEY))
+        {
+            string json = PlayerPrefs.GetString(SAVE_KEY);
+            GameData data = JsonUtility.FromJson<GameData>(json);
+            Debug.Log("Datos cargados exitosamente");
+            return data;
+        }
+        else
+        {
+            Debug.Log("No hay datos guardados, creando nuevos datos");
+            return new GameData();
+        }
+    }
+
+    // Borrar todos los datos
+    public void DeleteAllData()
+    {
+        PlayerPrefs.DeleteKey(SAVE_KEY);
+        PlayerPrefs.Save();
+        Debug.Log("Todos los datos han sido eliminados");
+    }
+
+    // Verificar si existen datos guardados
+    public bool HasSavedData()
+    {
+        return PlayerPrefs.HasKey(SAVE_KEY);
+    }
+
+    // Auto-guardado cada cierto tiempo
+    private float autoSaveInterval = 60f; // 60 segundos
+    private float autoSaveTimer = 0f;
+
+    private void Update()
+    {
+        autoSaveTimer += Time.deltaTime;
+        if (autoSaveTimer >= autoSaveInterval)
+        {
+            autoSaveTimer = 0f;
+            if (GameManager.Instance != null)
+            {
+                GameManager.Instance.SaveGame();
+            }
+        }
+    }
+}
