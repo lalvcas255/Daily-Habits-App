@@ -13,11 +13,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "/home/leire-pei-alvarez-de-los-corrale/Unity/Unity - helloWorld()/Daily Habits App/Assembly-CSharp.csproj",
+      "projectUniqueName": "/home/leire-pei-alvarez-de-los-corrale/Daily Habits App/Assembly-CSharp.csproj",
       "projectName": "Assembly-CSharp",
-      "projectPath": "/home/leire-pei-alvarez-de-los-corrale/Unity/Unity - helloWorld()/Daily Habits App/Assembly-CSharp.csproj",
+      "projectPath": "/home/leire-pei-alvarez-de-los-corrale/Daily Habits App/Assembly-CSharp.csproj",
       "packagesPath": "/home/leire-pei-alvarez-de-los-corrale/.nuget/packages/",
-      "outputPath": "/home/leire-pei-alvarez-de-los-corrale/Unity/Unity - helloWorld()/Daily Habits App/Temp/obj/Debug/Assembly-CSharp/",
+      "outputPath": "/home/leire-pei-alvarez-de-los-corrale/Daily Habits App/Temp/obj/Debug/Assembly-CSharp/",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "/home/leire-pei-alvarez-de-los-corrale/.nuget/NuGet/NuGet.Config"
